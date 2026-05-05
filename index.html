@@ -349,6 +349,13 @@
             display: block;
         }
 
+        /* Mobile portrait: để video hiển thị đúng tỉ lệ dọc, không bị ép 4:3 */
+        @media (max-width: 600px) and (orientation: portrait) {
+            video {
+                aspect-ratio: 3/4;
+            }
+        }
+
         #timer {
             position: absolute;
             inset: 0;
@@ -1538,31 +1545,35 @@
                 flash.style.opacity = 1;
                 setTimeout(() => flash.style.opacity = 0, 120);
 
-                // Capture - mô phỏng object-fit:cover + aspect-ratio:4/3 như preview video
-                // để ảnh chụp khớp đúng với những gì người dùng thấy trên màn hình
+                // Capture - mô phỏng object-fit:cover như preview video
+                // Desktop (landscape): crop về 4:3 cho khớp preview
+                // Mobile (portrait): giữ nguyên tỉ lệ thực, không kéo méo
                 const c = document.createElement('canvas');
                 const vW = video.videoWidth || 900;
                 const vH = video.videoHeight || 675;
-                const targetAR = 4 / 3;
                 const videoAR = vW / vH;
-                let sx, sy, sw, sh;
-                if (videoAR > targetAR) {
-                    // Video rộng hơn → crop 2 bên
-                    sh = vH;
-                    sw = vH * targetAR;
-                    sx = (vW - sw) / 2;
-                    sy = 0;
+                const isPortrait = vH > vW;
+                let sx, sy, sw, sh, outW, outH;
+                if (isPortrait) {
+                    // Mobile portrait: chụp toàn bộ, giữ đúng tỉ lệ
+                    sx = 0; sy = 0; sw = vW; sh = vH;
+                    outW = 675; outH = 900;
                 } else {
-                    // Video cao hơn → crop trên dưới
-                    sw = vW;
-                    sh = vW / targetAR;
-                    sx = 0;
-                    sy = (vH - sh) / 2;
+                    // Desktop landscape: crop object-fit:cover về 4:3
+                    const targetAR = 4 / 3;
+                    if (videoAR > targetAR) {
+                        sh = vH; sw = vH * targetAR;
+                        sx = (vW - sw) / 2; sy = 0;
+                    } else {
+                        sw = vW; sh = vW / targetAR;
+                        sx = 0; sy = (vH - sh) / 2;
+                    }
+                    outW = 900; outH = 675;
                 }
-                c.width = 900; c.height = 675;
+                c.width = outW; c.height = outH;
                 const t = c.getContext('2d');
-                if (app.facingMode === 'user') { t.translate(900, 0); t.scale(-1, 1); }
-                t.drawImage(video, sx, sy, sw, sh, 0, 0, 900, 675);
+                if (app.facingMode === 'user') { t.translate(outW, 0); t.scale(-1, 1); }
+                t.drawImage(video, sx, sy, sw, sh, 0, 0, outW, outH);
                 const dataUrl = c.toDataURL('image/jpeg', 0.92);
                 app.photos.push(dataUrl);
 
